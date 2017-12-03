@@ -32,4 +32,5 @@ def pad_message(msg, l):
     while i<len(pad):
         msg += chr(int(pad[i:i+8],2))
         i += 8
+
     return msg
