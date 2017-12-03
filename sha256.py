@@ -53,7 +53,7 @@ def process_chunk(md, chunk):
     for i in range(16, 64):
             s0 = rightRotate(w[i-15], 7) ^ rightRotate(w[i-15], 18) ^ (w[i-15] >> 3)
             s1 = rightRotate(w[i-2], 17) ^ rightRotate(w[i-2], 19) ^ (w[i-2] >> 10)
-            w[i] = (w[i-16] + s0 + w[i-7] + s1) & 0xFFFFFFFFL
+            w[i] = toLong(w[i-16] + s0 + w[i-7] + s1)
         
     a = md[0]
     b = md[1]
@@ -65,33 +65,34 @@ def process_chunk(md, chunk):
     h = md[7]
         
     for i in range(64):
-            s1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)
-            ch = (e & f) ^ ((~e) & g)
-            temp1 = h + s1 + ch + k[i] + w[i]
-            s0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)
-            maj = (a & b) ^ (a & c) ^ (b & c)
-            temp2 = s0 + maj
-            
-            h = g
-            g = f
-            f = e
-            e = (d + temp1) & 0xFFFFFFFFL
-            d = c
-            c = b
-            b = a
-            a = (temp1 + temp2) & 0xFFFFFFFFL
+        s1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)
+        ch = (e & f) ^ ((~e) & g)
+        temp1 = h + s1 + ch + k[i] + w[i]
+        s0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)
+        maj = (a & b) ^ (a & c) ^ (b & c)
+        temp2 = s0 + maj
         
-    md[0] = (md[0] + a) & 0xFFFFFFFFL
-    md[1] = (md[1] + b) & 0xFFFFFFFFL
-    md[2] = (md[2] + c) & 0xFFFFFFFFL
-    md[3] = (md[3] + d) & 0xFFFFFFFFL
-    md[4] = (md[4] + e) & 0xFFFFFFFFL
-    md[5] = (md[5] + f) & 0xFFFFFFFFL
-    md[6] = (md[6] + g) & 0xFFFFFFFFL
-    md[7] = (md[7] + h) & 0xFFFFFFFFL
+        h = g
+        g = f
+        f = e
+        e = toLong(d + temp1)
+        d = c
+        c = b
+        b = a
+        a = toLong(temp1 + temp2) 
+        
+    md[0] = md[0] + a
+    md[1] = md[1] + b
+    md[2] = md[2] + c
+    md[3] = md[3] + d
+    md[4] = md[4] + e
+    md[5] = md[5] + f
+    md[6] = md[6] + g
+    md[7] = md[7] + h
+    for i in range(8):
+        md[i] = toLong(md[i])
 
     return md
-
 
 def hexdigest(md):
     """ Return the hex digest of the hashed value. """
@@ -101,19 +102,26 @@ def hexdigest(md):
     return digest
 
 def rightRotate(chunkPart, n):
-    v = ((chunkPart >> n) | (chunkPart << (32-n))) & 0xFFFFFFFFL
-    return v   
+    v = (chunkPart >> n) | (chunkPart << (32-n))
+    return toLong(v)   
 
-def sha256(md, msg):
+def toLong(value):
+    return value & 0xFFFFFFFFL
+
+def sha256(msg):
     """ Return the SHA-256 hash of msg as a hex string. """
     # Pad the message
     msg = pad_message(msg)
     
+    # Initialization vector
+    md = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+          0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
+
     # Break msg into 512-bit chunks
     view = memoryview(msg)
-    for chunk_num in range(len(msg)/64):
-        chunk_start = 64*chunk_num
-        md = process_chunk(md, view[chunk_start:chunk_start+64])
+    for chunk_start in range(0, len(msg), 64):
+	md = process_chunk(md, view[chunk_start:chunk_start+64])
+
     # Produce the final value
     return hexdigest(md)
 
@@ -121,8 +129,4 @@ if __name__ == '__main__':
     import sys
     if len(sys.argv) != 2:
         sys.exit("Usage: {} string".format(sys.argv[0]))
-    
-    # Initialization vector
-    md = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-          0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
-    print sha256(md, sys.argv[1])
+    print sha256(sys.argv[1])
